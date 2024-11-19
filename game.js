@@ -1,21 +1,25 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = 800;
-canvas.height = 600;
 
-// resize canvas size depending of device width
-if (window.innerWidth < 800) {
-    canvas.width = window.innerWidth - 20;
-    canvas.height = 400;
+// デバイスに応じてキャンバスのサイズを設定
+function resizeCanvas() {
+    if (window.innerWidth < 800) {
+        canvas.width = window.innerWidth - 20;
+        canvas.height = window.innerHeight - 20 > 400 ? 400 : window.innerHeight - 20;
+    } else {
+        canvas.width = 800;
+        canvas.height = 600;
+    }
 }
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
 
-// player img
+// プレイヤーとモブの画像
 const playerImgRight = new Image();
 playerImgRight.src = '../games/img/playerRight.png';
 const playerImgLeft = new Image();
 playerImgLeft.src = '../games/img/playerLeft.png';
 
-// mob img
 const mobImgRight = new Image();
 mobImgRight.src = '../games/img/angryRight.png';
 const mobImgLeft = new Image();
@@ -23,8 +27,6 @@ mobImgLeft.src = '../games/img/angryLeft.png';
 const mobAngryImg = new Image();
 mobAngryImg.src = '../games/img/veryAngry.png';
 
-
-// unko img
 const unkoImgs = [
     '../games/img/unko1.png',
     '../games/img/unko2.png',
@@ -32,7 +34,7 @@ const unkoImgs = [
     '../games/img/unko4.png',
     '../games/img/unko5.png',
     '../games/img/unko6.png'
-]
+];
 
 const unkoTypes = [
     { src: unkoImgs[0], points: -20, speed: 2, zigzag: false },
@@ -40,7 +42,7 @@ const unkoTypes = [
     { src: unkoImgs[2], points: 50, speed: 3, zigzag: false },
     { src: unkoImgs[3], points: 100, speed: 4, zigzag: false },
     { src: unkoImgs[4], points: 200, speed: 5, zigzag: false },
-    { src: unkoImgs[5], points: 500, speed: 6, zigzag: true },
+    { src: unkoImgs[5], points: 500, speed: 6, zigzag: true }
 ];
 
 let player = {
@@ -67,9 +69,16 @@ let mobSpawnRate = 3000;
 let lastUnkoSpawnTime = Date.now();
 let lastMobSpawnTime = Date.now();
 let gameOver = false;
+let gameStarted = false;
 
-// handle keyboard input
+// キーボード入力の処理
 document.addEventListener('keydown', (e) => {
+    if (e.key === ' ') {
+        if (!gameStarted) {
+            gameStarted = true;
+            gameLoop();
+        }
+    }
     if (e.key === 'ArrowLeft') {
         player.moveLeft = true;
         player.direction = 'left';
@@ -89,13 +98,13 @@ document.addEventListener('keyup', (e) => {
     if (e.key === 'ArrowRight') player.moveRight = false;
 });
 
-// for smartphone
+// スマホ向けのタッチイベント
 canvas.addEventListener('touchstart', handleTouch);
 function handleTouch(event) {
     const touchX = event.touches[0].clientX;
     const touchY = event.touches[0].clientY;
 
-    if (touchY < canvas.height / 2 && !player.isJumping) {
+    if (touchY < canvas.height / 3 && !player.isJumping) {
         player.isJumping = true;
         player.velocityY = -player.jumpPower;
     } else if (touchX < canvas.width / 2) {
@@ -112,175 +121,56 @@ canvas.addEventListener('touchend', () => {
     player.moveRight = false;
 });
 
-// generate mob
+// 暴徒の生成関数（常に画面の端から出現）
 function createMob() {
     const angry = Math.random() > 0.7;
+    const startX = Math.random() < 0.5 ? 0 : canvas.width - 50;
     const mob = {
-        x: angry ? (Math.random() < 0.5 ? 0 : canvas.width - 50) : Math.random() * canvas.width,
+        x: startX,
         y: canvas.height - 80,
         width: 50,
         height: 50,
         speed: angry ? 8 : 3 + Math.random() * 3,
-        direction: angry ? (Math.random() < 0.5 ? 'left': 'right') : (Math.random() < 0.5 ? 'left' : 'right'),
+        direction: startX === 0 ? 'right' : 'left',
         angry: angry,
-        img: angry ? mobAngryImg : (Math.random() < 0.5 ? mobImgRight : mobImgLeft)
+        img: angry ? mobAngryImg : (startX === 0 ? mobImgRight : mobImgLeft)
     };
     mobs.push(mob);
 }
 
-// generate unko
-function createUnko() {
-    const type = unkoTypes[Math.floor(Math.random() * unkoTypes.length)];
-    const img = new Image();
-    img.src = type.src;
-    const unko = {
-        img: img,
-        x: Math.random() * (canvas.width - 30),
-        y: 0,
-        width: 40,
-        height: 40,
-        speed: type.speed,
-        points: type.points,
-        zigzag: type.zigzag,
-        direction: Math.random() < 0.5 ? -1 : 1
-    };
-    unkos.push(unko);
-}
-
-// draw player
-function drawPlayer() {
-    const playerImg = player.direction === 'right' ? playerImgRight : playerImgLeft;
-    ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-}
-
-// draw unko
-function drawUnkos() {
-    unkos.forEach((unko) => {
-        ctx.drawImage(unko.img, unko.x, unko.y, unko.width, unko.height);
-    });
-}
-
-// draw mob
-function drawMobs() {
-    mobs.forEach((mob) => {
-        ctx.drawImage(mob.img, mob.x, mob.y, mob.width, mob.height);
-    });
-}
-
-// move player
-function movePlayer() {
-    if (player.moveLeft && player.x > 0) player.x -= player.speed;
-    if (player.moveRight && player.x < canvas.width - player.width) player.x += player.speed;
-
-    if (player.isJumping) {
-        player.velocityY += player.gravity;
-        player.y += player.velocityY;
-
-        // finish jump when reached ground
-        if (player.y >= canvas.height - 80) {
-            player.y = canvas.height - 80;
-            player.isJumping = false;
-            player.velocityY = 0;
-        }
-    }
-}
-
-// move mobs
-function moveMobs() {
-    mobs.forEach((mob, index) => {
-        mob.x += mob.direction === 'right' ? mob.speed : -mob.speed;
-
-        // erase if out of screen
-        if (mob.x < -50 || mob.x > canvas.width) {
-            mobs.splice(index, 1);
-        }
-
-        // collision detection with player
-        if (
-            player.x < mob.x + mob.width &&
-            player.x + player.width > mob.x &&
-            player.y < mob.y + mob.height &&
-            player.y + player.height > mob.y
-        ) {
-            gameOver = true;
-            score = 0;
-        }
-    });
-}
-
-// move unko
-function moveUnkos() {
-    unkos.forEach((unko, index) => {
-        if (unko.zigzag) {
-            unko.x += unko.direction * 3;
-            if (unko.x <= 0 || unko.x >= canvas.width - unko.width) unko.direction *= -1;
-        }
-        unko.y += unko.speed;
-
-        // if collided with player, add points and erase
-        if (
-            unko.y + unko.height >= player.y &&
-            unko.x < player.x + player.width &&
-            unko.x + unko.width > player.x) {
-            score += unko.points;
-            unkos.splice(index, 1);
-        }
-
-        // erase if out of canvas
-        if (unko.y > canvas.height) {
-            unkos.splice(index, 1);
-        }
-    });
-}
-
-// show score and timer
-function drawUI() {
+// 初期画面の表示
+function drawStartScreen() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#000';
+    ctx.font = '36px Arial';
+    ctx.fillText('Press SPACE to Start', canvas.width / 2 - 150, canvas.height / 2);
     ctx.font = '24px Arial';
-    ctx.fillText(`Score: ${score}`, 10, 30);
-    ctx.fillText(`Time: ${Math.max(0, Math.floor(gameTime))}`, canvas.width - 120, 30);
+    ctx.fillText('Use Arrow keys to move and jump', canvas.width / 2 - 200, canvas.height / 2 + 50);
+    ctx.fillText('Catch the good items, avoid the bad ones!', canvas.width / 2 - 220, canvas.height / 2 + 90);
 }
 
-// game loop
+// ゲームループ
 function gameLoop() {
+    if (!gameStarted) return;
+
     if (gameOver) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.font = '48px Arial';
         ctx.fillStyle = 'red';
-        ctx.fillText('Game over', canvas.width / 2 - 120, canvas.height / 2);
+        ctx.fillText('Game Over', canvas.width / 2 - 120, canvas.height / 2);
         ctx.fillText(`Final Score: ${score}`, canvas.width / 2 - 140, canvas.height / 2 + 60);
         return;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     movePlayer();
     moveMobs();
-    moveUnkos();
     drawPlayer();
     drawMobs();
-    drawUnkos();
-    drawUI();
-
-    // generate unkos (gain speeds along time passing)
-    if (Date.now() - lastUnkoSpawnTime > unkoSpawnRate) {
-        createUnko();
-        lastUnkoSpawnTime = Date.now();
-        unkoSpawnRate *= 0.98;
-    }
-
-    // generate mobs
-    if (Date.now() - lastMobSpawnTime > mobSpawnRate) {
-        createMob();
-        lastMobSpawnTime = Date.now();
-    }
-
-    // renew timer
-    gameTime -= 0.016;
-    if (gameTime <= 0) {
-        gameOver = true;
-    }
 
     requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
+// 初期画面の描画
+if (!gameStarted) drawStartScreen();
